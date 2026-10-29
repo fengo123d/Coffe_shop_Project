@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PT Rona Kopi Riau - ERP Operations</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; }
+        .odoo-purple { background-color: #34495e; }
+        .odoo-purple-dark { background-color: #243746; }
+        .odoo-btn-primary { background-color: #0f766e; color: white; }
+        .odoo-btn-primary:hover { background-color: #115e59; }
+        .status-pill { padding: 4px 12px; border-radius: 9999px; font-weight: 600; font-size: 11px; }
+        .status-draft { background-color: #e2e8f0; color: #475569; }
+        .status-active { background-color: #714B67; color: white; }
+        .status-done { background-color: #dcfce7; color: #166534; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden text-slate-800">
+
+    <!-- TOP HEADER / ODOO SWITCHER -->
+    <header class="odoo-purple text-white h-12 flex items-center justify-between px-4 shrink-0 shadow">
+        <div class="flex items-center space-x-4">
+            <button onclick="toggleAppMenu()" class="p-1.5 hover:bg-white/10 rounded flex items-center gap-2 font-medium text-sm">
+                <i data-lucide="grid" class="w-5 h-5"></i>
+                <span>Apps</span>
+            </button>
+            <span class="text-xs bg-white/20 px-2.5 py-1 rounded-md text-purple-100 font-semibold" id="current-app-title">Sales & CRM</span>
+        </div>
+
+        <div class="flex items-center space-x-4 text-xs">
+            <div class="flex items-center space-x-1.5 bg-black/20 px-3 py-1 rounded-md">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                <span class="text-slate-300">Hak Akses:</span>
+                <select id="role-select" onchange="changeRole(this.value)" class="bg-transparent font-bold text-white cursor-pointer focus:outline-none">
+                    <option value="Master" class="text-black">Master Account (Admin)</option><option value="Sales" class="text-black">Sales (Dina)</option>
+                    <option value="Warehouse" class="text-black">Warehouse (Fajar)</option>
+                    <option value="Procurement" class="text-black">Procurement (Sari)</option>
+                    <option value="Finance" class="text-black">Finance (Rizal)</option>
+                    <option value="Production" class="text-black">Production (Nadia)</option>
+                </select>
+            </div>
+            <div class="border-r border-white/20 h-4"></div>
+            <span class="font-semibold text-slate-200">PT Rona Kopi Riau</span>
+        </div>
+    </header>
+
+    <!-- MAIN APPS MENU GRID -->
+    <div id="app-menu-dropdown" class="hidden absolute top-12 left-0 w-full bg-slate-900/95 text-white z-50 p-6 shadow-2xl border-b border-slate-700 backdrop-blur-md">
+        <div class="max-w-4xl mx-auto grid grid-cols-3 md:grid-cols-6 gap-6 text-center">
+            <button data-module-link="sales" onclick="switchApp('sales')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="shopping-bag" class="w-7 h-7 mx-auto mb-1.5 text-teal-300"></i><span class="text-xs font-medium">Sales</span></button>
+            <button data-module-link="purchase" onclick="switchApp('purchase')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="shopping-cart" class="w-7 h-7 mx-auto mb-1.5 text-blue-400"></i><span class="text-xs font-medium">Purchase</span></button>
+            <button data-module-link="inventory" onclick="switchApp('inventory')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="boxes" class="w-7 h-7 mx-auto mb-1.5 text-emerald-400"></i><span class="text-xs font-medium">Inventory</span></button>
+            <button data-module-link="manufacturing" onclick="switchApp('manufacturing')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="factory" class="w-7 h-7 mx-auto mb-1.5 text-indigo-400"></i><span class="text-xs font-medium">Manufacturing</span></button>
+            <button data-module-link="accounting" onclick="switchApp('accounting')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="calculator" class="w-7 h-7 mx-auto mb-1.5 text-teal-400"></i><span class="text-xs font-medium">Accounting</span></button>
+            <button data-module-link="dashboard" onclick="switchApp('dashboard')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="layout-dashboard" class="w-7 h-7 mx-auto mb-1.5 text-amber-400"></i><span class="text-xs font-medium">Dashboard</span></button>
+            <button data-module-link="products" onclick="switchApp('products')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="package" class="w-7 h-7 mx-auto mb-1.5 text-teal-300"></i><span class="text-xs font-medium">Products</span></button>
+            <button data-module-link="contacts" onclick="switchApp('contacts')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="contact" class="w-7 h-7 mx-auto mb-1.5 text-sky-300"></i><span class="text-xs font-medium">Contacts</span></button>
+            <button data-module-link="employees" onclick="switchApp('employees')" class="p-3 hover:bg-white/10 rounded-xl transition"><i data-lucide="users" class="w-7 h-7 mx-auto mb-1.5 text-amber-300"></i><span class="text-xs font-medium">Access Control</span></button>
+        </div>
+    </div>
+
+    <!-- BREADCRUMB / CONTROL BAR -->
+    <div class="bg-white border-b px-6 py-2.5 flex items-center justify-between shrink-0 shadow-sm">
+        <div class="flex items-center space-x-2 text-sm">
+            <span class="font-bold text-slate-800 tracking-wide" id="breadcrumb-app">SALES</span>
+            <span class="text-slate-400">/</span>
+            <span class="text-slate-500 font-medium" id="breadcrumb-view">Sales Orders</span>
+        </div>
+        <button onclick="resetSeedData()" class="bg-slate-800 text-white hover:bg-black px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset Demo Data
+        </button>
+    </div>
+
+    <!-- APPLICATION CONTENT WRAPPER -->
+    <div class="flex-1 overflow-auto p-6 bg-slate-100">
+
+        <!-- ==================== SALES MODULE ==================== -->
+        <div id="view-sales" class="app-view space-y-5">
+            <!-- SO INPUT FORM (ODOO FORM VIEW) -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="file-plus" class="w-4 h-4 text-teal-700"></i>
+                        Buat Sales Order
+                    </h2>
+                    <span class="text-xs text-slate-400 font-mono">Control: SR-07 (Diskon &le;10%), SR-08 (Credit Exposure)</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Pelanggan B2B:</label>
+                        <select id="so-cust-input" class="w-full border border-slate-300 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-teal-600 focus:outline-none">
+                            <option value="C001">C001 - Toko Oleh-Oleh Lancang Kuning (Limit: Rp1.500.000)</option>
+                            <option value="C002">C002 - CV Kopi Pelita Riau (Limit: Rp3.000.000)</option>
+                            <option value="C003">C003 - Kafe Muara Rasa (Limit: Rp2.000.000)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Lokasi Gudang Stok:</label>
+                        <select id="so-wh-input" class="w-full border border-slate-300 p-2 rounded-lg bg-slate-50">
+                            <option value="WH-PKU-FG">WH-PKU-FG (Gudang Produk Jadi Pekanbaru)</option>
+                            <option value="WH-DUM-FG">WH-DUM-FG (Gudang Distribusi Dumai)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">SKU Varian Kopi:</label>
+                        <select id="so-sku-input" onchange="calculateSOTotal()" class="w-full border border-slate-300 p-2 rounded-lg bg-slate-50">
+                            <option value="FG-AR-200">FG-AR-200 - Arabika Gayo Bubuk 200g (Rp40.000/pcs)</option>
+                            <option value="FG-AR-100">FG-AR-100 - Arabika Gayo Bubuk 100g (Rp24.000/pcs)</option>
+                            <option value="FG-RB-200">FG-RB-200 - Robusta Kerinci Bubuk 200g (Rp34.000/pcs)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Kuantitas Order (Pcs):</label>
+                        <input type="number" id="so-qty-input" value="10" min="1" onchange="calculateSOTotal()" onkeyup="calculateSOTotal()" class="w-full border border-slate-300 p-2 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Diskon Penjualan (%):</label>
+                        <input type="number" id="so-disc-input" value="0" min="0" max="100" onchange="calculateSOTotal()" onkeyup="calculateSOTotal()" class="w-full border border-slate-300 p-2 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Estimasi Gross (+11% PPN):</label>
+                        <input type="text" id="so-total-preview" value="Rp444.000" readonly class="w-full border border-slate-200 bg-slate-100 p-2 rounded-lg font-bold text-slate-700">
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="createSalesOrder()" class="odoo-btn-primary px-5 py-2 rounded-lg text-xs font-bold shadow flex items-center gap-2">
+                        <i data-lucide="check-circle" class="w-4 h-4"></i> Confirm Order & Reserve Stock
+                    </button>
+                </div>
+            </div>
+
+            <!-- SO LIST VIEW -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 border-b bg-slate-50 font-bold text-xs text-slate-700">Daftar Dokumen Sales Order</div>
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 text-slate-600 border-b">
+                        <tr>
+                            <th class="p-3">No. SO</th>
+                            <th class="p-3">Pelanggan</th>
+                            <th class="p-3">SKU Produk</th>
+                            <th class="p-3 text-center">Ordered / Delivered</th>
+                            <th class="p-3">Status Lifecycle</th>
+                            <th class="p-3 text-right">Total Gross</th>
+                            <th class="p-3 text-center">Aksi Operasional</th>
+                        </tr>
+                    </thead>
+                    <tbody id="so-table-body" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== PURCHASE MODULE ==================== -->
+        <div id="view-purchase" class="app-view hidden space-y-5">
+            <!-- PO INPUT FORM -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="file-plus" class="w-4 h-4 text-blue-600"></i>
+                        Buat Purchase Order
+                    </h2>
+                    <span class="text-xs text-slate-400 font-mono">Control: SR-21 (RFQ ke PO Lifecycle)</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Pemasok / Vendor:</label>
+                        <select id="po-vendor-input" class="w-full border border-slate-300 p-2 rounded-lg bg-slate-50">
+                            <option value="V01">V01 - Koperasi Arabika Gayo (Aceh Tengah)</option>
+                            <option value="V02">V02 - CV Robusta Kerinci (Kerinci)</option>
+                            <option value="V03">V03 - PT Kemasan Sumatra (Medan)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Item Material Dipesan:</label>
+                        <select id="po-sku-input" class="w-full border border-slate-300 p-2 rounded-lg bg-slate-50">
+                            <option value="RM-AR-KG">RM-AR-KG - Biji Arabika Sangrai (kg)</option>
+                            <option value="PK-200">PK-200 - Pouch Kemasan 200g (pcs)</option>
+                            <option value="LB-STD">LB-STD - Label Cetak Merek (pcs)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Kuantitas Dipesan:</label>
+                        <input type="number" id="po-qty-input" value="20" min="1" class="w-full border border-slate-300 p-2 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Harga Beli Per Unit (IDR):</label>
+                        <input type="number" id="po-price-input" value="85000" class="w-full border border-slate-300 p-2 rounded-lg">
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="createPurchaseOrder()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-bold shadow flex items-center gap-2">
+                        <i data-lucide="send" class="w-4 h-4"></i> Confirm Purchase Order
+                    </button>
+                </div>
+            </div>
+
+            <!-- PO LIST VIEW -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 border-b bg-slate-50 font-bold text-xs text-slate-700">Daftar Dokumen Purchase Order</div>
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 text-slate-600 border-b">
+                        <tr>
+                            <th class="p-3">No. PO</th>
+                            <th class="p-3">Vendor</th>
+                            <th class="p-3">Material</th>
+                            <th class="p-3 text-center">Ordered / Received / Accepted / Rejected</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3 text-center">Aksi Quality Inspection</th>
+                        </tr>
+                    </thead>
+                    <tbody id="po-table-body" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== INVENTORY MODULE ==================== -->
+        <div id="view-inventory" class="app-view hidden space-y-5">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h2 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="boxes" class="w-4 h-4 text-emerald-600"></i>
+                    Ringkasan Stok Persediaan (On Hand, Reserved & Available per SKU)
+                </h2>
+                <table class="w-full text-xs text-left border">
+                    <thead class="bg-slate-100 border-b text-slate-600">
+                        <tr>
+                            <th class="p-2.5">SKU Varian</th>
+                            <th class="p-2.5">Nama Barang / Material</th>
+                            <th class="p-2.5">Lokasi Utama</th>
+                            <th class="p-2.5 text-right">On Hand (Fisik)</th>
+                            <th class="p-2.5 text-right">Reserved (Komitmen)</th>
+                            <th class="p-2.5 text-right">Available (Bebas)</th>
+                            <th class="p-2.5 text-right">Standard Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-table-body" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== MANUFACTURING MODULE ==================== -->
+        <div id="view-manufacturing" class="app-view hidden space-y-5">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2 border-b pb-3">
+                    <i data-lucide="factory" class="w-4 h-4 text-sky-700"></i>
+                    Manufacturing Order (Pengolahan / Produksi Kopi Bubuk - SR-11 & SR-12)
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Target Produksi (FG):</label>
+                        <select id="mo-sku-input" class="w-full border border-slate-300 p-2 rounded-lg bg-slate-50">
+                            <option value="FG-AR-200">FG-AR-200 - Arabika Gayo Bubuk 200g</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Jumlah Batch Produksi (Pcs):</label>
+                        <input type="number" id="mo-qty-input" value="10" min="1" class="w-full border border-slate-300 p-2 rounded-lg">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="executeMO()" class="bg-sky-700 hover:bg-sky-800 text-white w-full py-2 rounded-lg text-xs font-bold shadow flex items-center justify-center gap-2">
+                            <i data-lucide="play-circle" class="w-4 h-4"></i> Confirm & Complete Production
+                        </button>
+                    </div>
+                </div>
+
+                <!-- BOM RECIPE CARD -->
+                <div class="bg-slate-50 p-4 rounded-lg border text-xs font-mono space-y-1 text-slate-700">
+                    <div class="font-bold text-sky-900 mb-1">BOM Master Recipe untuk FG-AR-200 (Per 1 Pcs):</div>
+                    <div>&bull; 0.2 kg Biji Arabika Sangrai (RM-AR-KG) @ Rp80.000 = Rp16.000</div>
+                    <div>&bull; 1.0 pcs Pouch Kemasan 200g (PK-200) @ Rp4.000 = Rp4.000</div>
+                    <div>&bull; 1.0 pcs Label Cetak Merek (LB-STD) @ Rp2.000 = Rp2.000</div>
+                    <div class="font-bold text-slate-900 border-t pt-1 mt-1">Total Biaya Standar Resep: Rp22.000 / pcs</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== DASHBOARD MODULE ==================== -->
+        <div id="view-dashboard" class="app-view hidden space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-xl border shadow-sm">
+                    <p class="text-xs text-slate-500 font-medium">Stock Valuation (1130)</p>
+                    <h3 class="text-xl font-bold text-slate-800" id="kpi-stock">Rp0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border shadow-sm">
+                    <p class="text-xs text-slate-500 font-medium">Accounts Receivable (1100)</p>
+                    <h3 class="text-xl font-bold text-blue-600" id="kpi-ar">Rp0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border shadow-sm">
+                    <p class="text-xs text-slate-500 font-medium">Accounts Payable (2010)</p>
+                    <h3 class="text-xl font-bold text-red-600" id="kpi-ap">Rp0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl border shadow-sm">
+                    <p class="text-xs text-slate-500 font-medium">Bank Balance (1010)</p>
+                    <h3 class="text-xl font-bold text-teal-600" id="kpi-bank">Rp0</h3>
+                </div>
+            </div>
+
+            <!-- TRIAL BALANCE -->
+            <div class="bg-white p-6 rounded-xl border shadow-sm">
+                <h2 class="text-sm font-bold text-slate-800 mb-3">Trial Balance / General Ledger (Double-Entry Balance)</h2>
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 border-b">
+                        <tr><th class="p-2.5">Kode</th><th class="p-2.5">Nama Akun</th><th class="p-2.5 text-right">Debit (Rp)</th><th class="p-2.5 text-right">Kredit (Rp)</th></tr>
+                    </thead>
+                    <tbody id="tb-body" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- MASTER DATA: PRODUCTS -->
+        <div id="view-products" class="app-view hidden space-y-5">
+          <div class="bg-white p-5 rounded-xl border shadow-sm flex items-center justify-between"><div><h2 class="font-bold">Products & Variants</h2><p class="text-xs text-slate-500 mt-1">Kelola SKU, satuan, biaya standar, harga jual, dan stok awal.</p></div><button onclick="addProduct()" class="bg-teal-700 text-white rounded-md px-4 py-2 text-xs font-semibold">+ New Product</button></div>
+          <div class="bg-white rounded-xl border overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-slate-100"><tr><th class="p-3">Internal Reference</th><th class="p-3">Product Name</th><th class="p-3">Type</th><th class="p-3 text-right">On Hand</th><th class="p-3 text-right">Standard Cost</th><th class="p-3 text-right">Sales Price</th><th class="p-3">Action</th></tr></thead><tbody id="products-body" class="divide-y"></tbody></table></div>
+        </div>
+        <!-- MASTER DATA: CONTACTS -->
+        <div id="view-contacts" class="app-view hidden space-y-5">
+          <div class="bg-white p-5 rounded-xl border shadow-sm flex items-center justify-between"><div><h2 class="font-bold">Contacts</h2><p class="text-xs text-slate-500 mt-1">Customer/vendor records, credit limit, payment terms.</p></div><button onclick="addCustomer()" class="bg-teal-700 text-white rounded-md px-4 py-2 text-xs font-semibold">+ New Customer</button></div>
+          <div class="bg-white rounded-xl border overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-slate-100"><tr><th class="p-3">Contact ID</th><th class="p-3">Name</th><th class="p-3">City</th><th class="p-3">Credit Limit</th><th class="p-3">Payment Terms</th><th class="p-3">Action</th></tr></thead><tbody id="contacts-body" class="divide-y"></tbody></table></div>
+        </div>
+        <!-- MASTER ACCOUNT / RBAC -->
+        <div id="view-employees" class="app-view hidden space-y-5">
+          <div class="bg-white p-5 rounded-xl border shadow-sm"><h2 class="font-bold">Employees & Access Rights</h2><p class="text-xs text-slate-500 mt-1">Master Account dapat mengatur modul yang bisa dibuka tiap pegawai. Ini simulasi role-based access di aplikasi demo.</p><div class="mt-4 flex gap-2"><input id="new-employee-name" placeholder="Nama karyawan" class="border rounded-md px-3 py-2 text-xs"><select id="new-employee-role" class="border rounded-md px-3 py-2 text-xs"><option>Sales</option><option>Warehouse</option><option>Procurement</option><option>Finance</option><option>Production</option></select><button onclick="addEmployee()" class="bg-teal-700 text-white rounded-md px-4 py-2 text-xs font-semibold">Add Employee</button></div></div>
+          <div class="bg-white rounded-xl border overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-slate-100"><tr><th class="p-3">Employee</th><th class="p-3">Role</th><th class="p-3">Allowed Modules</th><th class="p-3">Action</th></tr></thead><tbody id="employees-body" class="divide-y"></tbody></table></div>
+          <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900"><b>Catatan keamanan:</b> role switch pada header disediakan untuk demo/testing. Untuk penggunaan nyata, autentikasi harus dipindahkan ke backend; izin frontend saja tidak cukup untuk melindungi data.</div>
+        </div>
+        <!-- VENDOR BILL / ACCOUNTING -->
+        <div id="view-accounting" class="app-view hidden space-y-5">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><div class="flex justify-between items-center mb-4"><div><h2 class="text-sm font-bold">Customer Invoices & Payments</h2><p class="text-xs text-slate-500">Invoice hanya dibuat dari kuantitas yang sudah dikirim; pembayaran parsial diperbolehkan.</p></div></div>
+                <table class="w-full text-xs text-left"><thead class="bg-slate-100 border-b text-slate-600"><tr><th class="p-3">No Invoice</th><th class="p-3">Pelanggan</th><th class="p-3 text-right">Total</th><th class="p-3 text-right">Paid</th><th class="p-3">Status</th><th class="p-3">Aksi</th></tr></thead><tbody id="invoice-table-body" class="divide-y"></tbody></table>
+            </div>
+            <div class="bg-white p-6 rounded-xl border shadow-sm"><div class="flex items-center justify-between mb-3"><div><h2 class="text-sm font-bold">Vendor Bills</h2><p class="text-xs text-slate-500">Buat tagihan dari PO yang sudah menerima barang. Receipt dan vendor bill adalah dokumen berbeda.</p></div><button onclick="createVendorBillPrompt()" class="bg-sky-700 text-white rounded-md px-3 py-2 text-xs font-semibold">Create Vendor Bill</button></div><div class="overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-slate-100"><tr><th class="p-3">Bill</th><th class="p-3">Vendor</th><th class="p-3">PO</th><th class="p-3 text-right">Total</th><th class="p-3 text-right">Paid</th><th class="p-3">Status</th><th class="p-3">Action</th></tr></thead><tbody id="vendor-bills-body" class="divide-y"></tbody></table></div></div>
+            <div class="bg-white p-6 rounded-xl border shadow-sm"><h2 class="text-sm font-bold mb-3">Posted Journal Entries</h2><p class="text-xs text-slate-500 mb-3">Semua posting harus balance: total debit = total credit. Entri yang sudah diposting tidak boleh diedit.</p><div class="overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-slate-100"><tr><th class="p-3">Reference</th><th class="p-3">Date</th><th class="p-3">Description</th><th class="p-3 text-right">Debit</th><th class="p-3 text-right">Credit</th><th class="p-3">Status</th></tr></thead><tbody id="journal-body" class="divide-y"></tbody></table></div><button onclick="manualJournalEntry()" class="mt-3 bg-slate-800 text-white rounded-md px-3 py-2 text-xs font-semibold">New Manual Journal Entry</button></div>
+        </div>
+
+        <!-- AUDIT LOG TRAIL -->
+        <div class="mt-6 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <h3 class="text-xs font-bold text-slate-700 uppercase mb-2 flex items-center gap-2">
+                <i data-lucide="history" class="w-3.5 h-3.5 text-slate-500"></i>
+                System Audit Trail & Log Notes (SR-16 Traceability & Idempotency)
+            </h3>
+            <div id="audit-logs" class="bg-slate-900 text-emerald-400 font-mono text-[11px] p-3 rounded-lg h-36 overflow-y-auto space-y-1"></div>
+        </div>
+    </div>
+
+    <!-- RECEIPT INSPECTION MODAL (SR-10 QC) -->
+    <div id="qc-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-xl shadow-2xl p-6 space-y-4">
+            <h3 class="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+                <i data-lucide="clipboard-check" class="w-4 h-4 text-blue-600"></i>
+                Quality Inspection Form (SR-10)
+            </h3>
+            <p class="text-xs text-slate-500">Isi hasil pemeriksaan fisik barang dari vendor. Hanya barang yang **Accepted** yang menambah nilai stok persediaan.</p>
+            
+            <input type="hidden" id="qc-po-id">
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold">Qty diterima untuk pemeriksaan:</label>
+                    <input type="number" id="qc-received-qty" readonly class="w-full border p-2 rounded bg-slate-100">
+                </div>
+                <div>
+                    <label class="block font-semibold text-emerald-700">Lolos QC (Accepted Qty):</label>
+                    <input type="number" id="qc-accepted-qty" onchange="calculateQC()" onkeyup="calculateQC()" class="w-full border border-emerald-300 p-2 rounded bg-emerald-50 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold text-red-700">Ditolak / Rusak (Rejected Qty):</label>
+                    <input type="number" id="qc-rejected-qty" readonly class="w-full border border-red-300 p-2 rounded bg-red-50 font-bold text-red-700">
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeQCModal()" class="px-4 py-2 rounded text-xs font-semibold bg-slate-200">Batal</button>
+                <button onclick="submitQC()" class="px-4 py-2 rounded text-xs font-semibold bg-blue-600 text-white">Validate Receipt & Update Stock</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+const TAX_RATE = 0.11;
+const money = n => 'Rp' + Math.round(Number(n) || 0).toLocaleString('id-ID');
+const clone = obj => JSON.parse(JSON.stringify(obj));
+
+const initialDataset = {
+  role: "Master",
+  ledger: {
+    "1010": {name:"Bank", debit:20000000, credit:0},
+    "1100": {name:"Accounts Receivable", debit:1110000, credit:0},
+    "1130": {name:"Stock Valuation", debit:19086000, credit:0},
+    "1140": {name:"VAT Input", debit:0, credit:0},
+    "2020": {name:"Stock Interim Received", debit:0, credit:0},
+    "2010": {name:"Accounts Payable", debit:0, credit:555000},
+    "2030": {name:"VAT Output", debit:0, credit:0},
+    "3010": {name:"Opening Equity", debit:0, credit:39641000},
+    "4010": {name:"Sales Revenue", debit:0, credit:0},
+    "5010": {name:"Cost of Goods Sold", debit:0, credit:0},
+    "1200": {name:"Work in Progress", debit:0, credit:0}
+  },
+  customers: {
+    C001:{name:"Toko Oleh-Oleh Lancang Kuning",creditLimit:1500000,unpaidAR:0},
+    C002:{name:"CV Kopi Pelita Riau",creditLimit:3000000,unpaidAR:1110000},
+    C003:{name:"Kafe Muara Rasa",creditLimit:2000000,unpaidAR:0}
+  },
+  vendors: {
+    V01:"Koperasi Arabika Gayo (Aceh Tengah)",
+    V02:"CV Robusta Kerinci (Kerinci)",
+    V03:"PT Kemasan Sumatra (Medan)"
+  },
+  inventory: {
+    "FG-AR-200":{name:"Arabika Gayo Bubuk 200g",location:"WH-PKU-FG",onHand:40,reserved:5,cost:22000,price:40000},
+    "FG-AR-100":{name:"Arabika Gayo Bubuk 100g",location:"WH-PKU-FG",onHand:35,reserved:0,cost:12000,price:24000},
+    "FG-RB-200":{name:"Robusta Kerinci Bubuk 200g",location:"WH-PKU-FG",onHand:50,reserved:0,cost:18000,price:34000},
+    "RM-AR-KG":{name:"Biji Arabika Sangrai (kg)",location:"WH-PKU-RAW",onHand:50,reserved:0,cost:80000,price:0},
+    "PK-200":{name:"Pouch Kemasan 200g (pcs)",location:"WH-PKU-RAW",onHand:100,reserved:0,cost:4000,price:0},
+    "LB-STD":{name:"Label Cetak Merek (pcs)",location:"WH-PKU-RAW",onHand:500,reserved:0,cost:2000,price:0}
+  },
+  salesOrders:[{id:"S00007",customer:"C001",sku:"FG-AR-200",qty:5,deliveredQty:0,price:40000,disc:0,status:"Sales Order",invoices:[]}],
+  purchaseOrders:[],
+  invoices:[],
+  nextSO:8,nextPO:8,nextINV:1,nextMO:1
+};
+let db = clone(initialDataset);
+const DEFAULT_PERMISSIONS={Master:['sales','purchase','inventory','manufacturing','accounting','dashboard','products','contacts','employees'],Sales:['sales','contacts'],Warehouse:['inventory','purchase'],Procurement:['purchase','products','contacts'],Finance:['accounting','dashboard','contacts'],Production:['manufacturing','inventory']};
+const defaultUsers=[{id:'U001',name:'Master Account',role:'Master',modules:DEFAULT_PERMISSIONS.Master.slice()},{id:'U002',name:'Dina Putri',role:'Sales',modules:DEFAULT_PERMISSIONS.Sales.slice()},{id:'U003',name:'Fajar Pratama',role:'Warehouse',modules:DEFAULT_PERMISSIONS.Warehouse.slice()},{id:'U004',name:'Sari Amelia',role:'Procurement',modules:DEFAULT_PERMISSIONS.Procurement.slice()},{id:'U005',name:'Rizal Akbar',role:'Finance',modules:DEFAULT_PERMISSIONS.Finance.slice()},{id:'U006',name:'Nadia Putri',role:'Production',modules:DEFAULT_PERMISSIONS.Production.slice()}];
+db.users=defaultUsers; db.vendorBills=[]; db.journals=[]; db.nextBill=1; db.nextUser=7;
+function saveDB(){try{localStorage.setItem('ronaKopiERP_v2',JSON.stringify(db));}catch(e){console.warn('Penyimpanan browser tidak tersedia',e);}}
+function loadDB(){try{const raw=localStorage.getItem('ronaKopiERP_v2');if(raw){const saved=JSON.parse(raw);db={...clone(initialDataset),...saved,ledger:saved.ledger||clone(initialDataset.ledger),inventory:saved.inventory||clone(initialDataset.inventory),customers:saved.customers||clone(initialDataset.customers)};}}catch(e){console.warn(e);}}
+function currentUser(){return db.users?.find(u=>u.role===db.role)||db.users?.[0];}
+function canModule(module){const u=currentUser();return db.role==='Master'||!!u?.modules?.includes(module);}
+
+
+function logAudit(msg) {
+  const el=document.getElementById('audit-logs');
+  if(!el) return;
+  const time=new Date().toLocaleTimeString('id-ID',{hour12:false});
+  el.insertAdjacentHTML('beforeend',`<div>[${time}] ${escapeHTML(msg)}</div>`);
+  el.scrollTop=el.scrollHeight;
+}
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function notify(message){ alert(message); }
+function hasRole(...roles){ if(db.role==='Master')return true; if(!roles.includes(db.role)){notify(`Akses ditolak: tindakan ini hanya untuk ${roles.join(' / ')}.`);return false;} return true; }
+function switchApp(name){
+  if(!canModule(name)){notify('Akses modul ditolak. Hubungi Master Account untuk mengatur izin.');return;}
+  document.querySelectorAll('.app-view').forEach(el=>el.classList.add('hidden'));
+  const view=document.getElementById(`view-${name}`);
+  if(view)view.classList.remove('hidden');
+  document.getElementById('breadcrumb-app').innerText=name.toUpperCase();
+  document.getElementById('current-app-title').innerText=name.charAt(0).toUpperCase()+name.slice(1);
+  const names={sales:'Sales Orders',purchase:'Purchase Orders',inventory:'Stock Overview',manufacturing:'Manufacturing Orders',accounting:'Customer Invoices',dashboard:'Finance Dashboard'};
+  document.getElementById('breadcrumb-view').innerText=names[name]||'Overview';
+  document.getElementById('app-menu-dropdown').classList.add('hidden');
+}
+function toggleAppMenu(){document.getElementById('app-menu-dropdown').classList.toggle('hidden');}
+function changeRole(role){db.role=role;logAudit(`Mode demo aktif: ${role}.`);applyModuleAccess();updateUI();}
+function applyModuleAccess(){document.querySelectorAll('[data-module-link]').forEach(el=>{el.classList.toggle('hidden',!canModule(el.dataset.moduleLink));});}
+function calculateSOTotal(){
+  const qty=Math.floor(Number(document.getElementById('so-qty-input').value)||0);
+  const disc=Number(document.getElementById('so-disc-input').value)||0;
+  const sku=document.getElementById('so-sku-input').value;
+  const price=db.inventory[sku]?.price||0;
+  const net=Math.max(0,qty)*price*(1-Math.max(0,Math.min(100,disc))/100);
+  document.getElementById('so-total-preview').value=money(net+Math.round(net*TAX_RATE));
+}
+function addLedger(code, side, amount){
+  if(!db.ledger[code]) return;
+  db.ledger[code][side]+=Math.round(amount);
+}
+function setStatus(order){
+  if(order.deliveredQty>=order.qty) order.status='Delivered';
+  else if(order.deliveredQty>0) order.status='Partially Delivered';
+  else order.status='Sales Order';
+}
+function createSalesOrder(){
+  if(!hasRole('Sales'))return;
+  const customerId=document.getElementById('so-cust-input').value;
+  const sku=document.getElementById('so-sku-input').value;
+  const qty=Math.floor(Number(document.getElementById('so-qty-input').value)||0);
+  const disc=Number(document.getElementById('so-disc-input').value)||0;
+  const item=db.inventory[sku], customer=db.customers[customerId];
+  if(!qty||qty<1)return notify('Kuantitas harus minimal 1.');
+  if(!Number.isFinite(disc)||disc<0||disc>10)return notify('Diskon harus berada di antara 0–10%.');
+  const available=item.onHand-item.reserved;
+  if(qty>available)return notify(`Stok tersedia hanya ${available} pcs. Kurangi kuantitas atau lakukan replenishment terlebih dahulu.`);
+  const net=qty*item.price*(1-disc/100), gross=net+Math.round(net*TAX_RATE);
+  const outstanding=db.invoices.filter(i=>i.customer===customerId&&i.status!=='Paid').reduce((sum,i)=>sum+i.amount,0);
+  const openOrders=db.salesOrders.filter(o=>o.customer===customerId&&o.status!=='Cancelled').reduce((sum,o)=>sum+Math.max(0,o.qty-o.deliveredQty)*o.price*(1-o.disc/100)*(1+TAX_RATE),0);
+  if(outstanding+openOrders+gross>customer.creditLimit)return notify(`Melebihi limit kredit. Tagihan terbuka + komitmen order + order baru = ${money(outstanding+openOrders+gross)}, limit ${money(customer.creditLimit)}.`);
+  const id=`S${String(db.nextSO++).padStart(5,'0')}`;
+  db.salesOrders.push({id,customer:customerId,sku,qty,deliveredQty:0,price:item.price,disc,status:'Sales Order',invoices:[]});
+  item.reserved+=qty;
+  logAudit(`Sales Order ${id} dikonfirmasi. ${qty} pcs ${sku} direservasi; total estimasi ${money(gross)}.`);
+  updateUI();
+}
+function deliverSO(id){
+  if(!hasRole('Warehouse'))return;
+  const so=db.salesOrders.find(o=>o.id===id); if(!so)return;
+  const item=db.inventory[so.sku], remaining=so.qty-so.deliveredQty;
+  if(remaining<=0)return notify('Semua kuantitas order sudah dikirim.');
+  const deliverQty=Math.min(remaining,item.reserved,item.onHand);
+  if(deliverQty<=0)return notify('Tidak ada stok terreservasi yang dapat dikirim.');
+  so.deliveredQty+=deliverQty; item.onHand-=deliverQty; item.reserved-=deliverQty; setStatus(so);
+  const cogs=deliverQty*item.cost;
+  // Delivery validates stock and records inventory expense. Revenue/AR are recorded by invoice.
+  addLedger('5010','debit',cogs); addLedger('1130','credit',cogs);
+  logAudit(`Delivery ${id}: ${deliverQty} pcs dikirim. Persediaan berkurang ${money(cogs)}; HPP dicatat.`);
+  updateUI();
+}
+function createInvoice(id){
+  if(!hasRole('Finance'))return;
+  const so=db.salesOrders.find(o=>o.id===id); if(!so)return;
+  const uninvoiced=so.deliveredQty-so.invoices.reduce((sum,invId)=>sum+(db.invoices.find(i=>i.id===invId)?.qty||0),0);
+  if(uninvoiced<=0)return notify('Tidak ada kuantitas terkirim yang belum ditagih.');
+  const net=uninvoiced*so.price*(1-so.disc/100), vat=Math.round(net*TAX_RATE), gross=net+vat;
+  const idInv=`INV/2026/${String(db.nextINV++).padStart(4,'0')}`;
+  db.invoices.push({id:idInv,customer:so.customer,soId:so.id,qty:uninvoiced,net,vat,amount:gross,status:'Posted'});
+  so.invoices.push(idInv);
+  db.customers[so.customer].unpaidAR+=gross;
+  addLedger('1100','debit',gross); addLedger('4010','credit',net); addLedger('2030','credit',vat);
+  logAudit(`Invoice ${idInv} diposting untuk ${uninvoiced} pcs dari ${so.id}; piutang ${money(gross)}.`);
+  updateUI();
+}
+function payInvoice(id){
+  if(!hasRole('Finance'))return;
+  const inv=db.invoices.find(i=>i.id===id); if(!inv||inv.status==='Paid')return;
+  const remaining=inv.amount-(inv.paid||0); const entered=Number(prompt(`Sisa tagihan ${money(remaining)}. Masukkan pembayaran (Rp):`,remaining)); if(!Number.isFinite(entered)||entered<=0||entered>remaining)return notify('Jumlah pembayaran tidak valid.'); inv.paid=(inv.paid||0)+Math.round(entered); inv.status=inv.paid>=inv.amount?'Paid':'Partial';
+  db.customers[inv.customer].unpaidAR=Math.max(0,db.customers[inv.customer].unpaidAR-Math.round(entered));
+  addLedger('1010','debit',entered); addLedger('1100','credit',entered);
+  logAudit(`Pembayaran ${id} sebesar ${money(entered)} direkonsiliasi. Status: ${inv.status}.`);
+  updateUI();
+}
+function createPurchaseOrder(){
+  if(!hasRole('Procurement'))return;
+  const vendor=document.getElementById('po-vendor-input').value, sku=document.getElementById('po-sku-input').value;
+  const qty=Math.floor(Number(document.getElementById('po-qty-input').value)||0), price=Number(document.getElementById('po-price-input').value)||0;
+  if(qty<1||price<=0)return notify('Kuantitas dan harga beli harus lebih dari 0.');
+  const id=`P${String(db.nextPO++).padStart(5,'0')}`;
+  db.purchaseOrders.push({id,vendor,sku,orderedQty:qty,receivedQty:0,acceptedQty:0,rejectedQty:0,price,status:'Purchase Order',billed:false});
+  logAudit(`Purchase Order ${id} dikonfirmasi ke ${db.vendors[vendor]}: ${qty} ${sku}. Stok belum bertambah sampai receipt divalidasi.`);
+  updateUI();
+}
+function openQCModal(id){
+  if(!hasRole('Warehouse'))return;
+  const po=db.purchaseOrders.find(p=>p.id===id); if(!po||po.status==='Received')return;
+  document.getElementById('qc-po-id').value=id;
+  document.getElementById('qc-received-qty').value=po.orderedQty-po.receivedQty;
+  document.getElementById('qc-accepted-qty').value=po.orderedQty-po.receivedQty;
+  document.getElementById('qc-rejected-qty').value=0;
+  document.getElementById('qc-modal').classList.remove('hidden');
+}
+function calculateQC(){
+  const rec=Math.max(0,Number(document.getElementById('qc-received-qty').value)||0);
+  const acc=Math.max(0,Math.min(rec,Math.floor(Number(document.getElementById('qc-accepted-qty').value)||0)));
+  document.getElementById('qc-accepted-qty').value=acc;
+  document.getElementById('qc-rejected-qty').value=rec-acc;
+}
+function closeQCModal(){document.getElementById('qc-modal').classList.add('hidden');}
+function submitQC(){
+  if(!hasRole('Warehouse'))return;
+  const id=document.getElementById('qc-po-id').value, po=db.purchaseOrders.find(p=>p.id===id);
+  if(!po)return;
+  const received=Math.max(0,Number(document.getElementById('qc-received-qty').value)||0);
+  const accepted=Math.floor(Number(document.getElementById('qc-accepted-qty').value)||0);
+  if(accepted<0||accepted>received)return notify('Jumlah accepted harus antara 0 dan jumlah received.');
+  const rejected=received-accepted, item=db.inventory[po.sku];
+  po.receivedQty+=received; po.acceptedQty+=accepted; po.rejectedQty+=rejected;
+  // Accepted quantities are valued at the actual PO unit price, not the standard cost.
+  item.onHand+=accepted; item.cost=item.onHand>0?Math.round(((item.onHand-accepted)*item.cost+accepted*po.price)/item.onHand):po.price;
+  const value=accepted*po.price;
+  addLedger('1130','debit',value); addLedger('2020','credit',value);
+  po.status=po.receivedQty>=po.orderedQty?'Received':'Partially Received';
+  closeQCModal();
+  logAudit(`Receipt ${id}: ${received} diterima fisik, ${accepted} lolos QC, ${rejected} ditolak. Nilai persediaan ${money(value)}.`);
+  updateUI();
+}
+function executeMO(){
+  if(!hasRole('Production'))return;
+  const sku=document.getElementById('mo-sku-input').value, qty=Math.floor(Number(document.getElementById('mo-qty-input').value)||0);
+  if(qty<1)return notify('Jumlah produksi harus minimal 1 pcs.');
+  const bom=[{sku:'RM-AR-KG',qty:qty*0.2},{sku:'PK-200',qty},{sku:'LB-STD',qty}];
+  for(const line of bom){
+    const item=db.inventory[line.sku];
+    if(!item||item.onHand-item.reserved<line.qty)return notify(`Bahan ${line.sku} tidak cukup. Tersedia ${item?item.onHand-item.reserved:0}, dibutuhkan ${line.qty}.`);
+  }
+  const totalCost=bom.reduce((sum,line)=>sum+line.qty*db.inventory[line.sku].cost,0);
+  bom.forEach(line=>db.inventory[line.sku].onHand-=line.qty);
+  const output=db.inventory[sku]; output.onHand+=qty;
+  // Consume component value and capitalize finished goods; net inventory value is unchanged.
+  addLedger('1130','credit',totalCost); addLedger('1130','debit',totalCost);
+  const moId=`MO${String(db.nextMO++).padStart(5,'0')}`;
+  logAudit(`Manufacturing Order ${moId} selesai: ${qty} pcs ${sku}; BOM dikonsumsi, biaya standar ${money(totalCost)}.`);
+  updateUI();
+}
+function renderLedger(){
+  const tbody=document.getElementById('tb-body');
+  tbody.innerHTML=Object.keys(db.ledger).map(k=>{
+    const a=db.ledger[k], net=a.debit-a.credit;
+    const debit=net>0?net:0, credit=net<0?-net:0;
+    return `<tr><td class="p-2.5 font-mono">${k}</td><td class="p-2.5">${escapeHTML(a.name)}</td><td class="p-2.5 text-right">${debit?money(debit):'-'}</td><td class="p-2.5 text-right">${credit?money(credit):'-'}</td></tr>`;
+  }).join('');
+}
+function updateUI(){
+  const cs=document.getElementById('so-cust-input');if(cs){const cur=cs.value;cs.innerHTML=Object.entries(db.customers).map(([id,c])=>`<option value="${id}">${escapeHTML(c.name)}</option>`).join('');if(db.customers[cur])cs.value=cur;}
+  const ss=document.getElementById('so-sku-input');if(ss){const cur=ss.value;ss.innerHTML=Object.entries(db.inventory).filter(([sku,p])=>p.price>0).map(([sku,p])=>`<option value="${sku}">${sku} — ${escapeHTML(p.name)} (${money(p.price)})</option>`).join('');if(db.inventory[cur])ss.value=cur;}
+  document.getElementById('kpi-stock').innerText=money(db.ledger['1130'].debit-db.ledger['1130'].credit);
+  document.getElementById('kpi-ar').innerText=money(db.ledger['1100'].debit-db.ledger['1100'].credit);
+  document.getElementById('kpi-ap').innerText=money(db.ledger['2010'].credit-db.ledger['2010'].debit);
+  document.getElementById('kpi-bank').innerText=money(db.ledger['1010'].debit-db.ledger['1010'].credit);
+  renderLedger();
+  document.getElementById('inventory-table-body').innerHTML=Object.entries(db.inventory).map(([sku,it])=>`<tr>
+    <td class="p-2.5 font-bold">${sku}</td><td class="p-2.5">${escapeHTML(it.name)}</td><td class="p-2.5">${it.location}</td>
+    <td class="p-2.5 text-right font-semibold">${it.onHand}</td><td class="p-2.5 text-right text-amber-600 font-semibold">${it.reserved}</td>
+    <td class="p-2.5 text-right font-bold text-emerald-700">${it.onHand-it.reserved}</td><td class="p-2.5 text-right">${money(it.cost)}</td></tr>`).join('');
+  document.getElementById('so-table-body').innerHTML=db.salesOrders.map(so=>{
+    const net=so.qty*so.price*(1-so.disc/100), gross=net+Math.round(net*TAX_RATE);
+    const uninvoiced=so.deliveredQty-so.invoices.reduce((sum,invId)=>sum+(db.invoices.find(i=>i.id===invId)?.qty||0),0);
+    return `<tr><td class="p-3 font-bold text-teal-700">${so.id}</td><td class="p-3">${escapeHTML(db.customers[so.customer].name)}</td>
+      <td class="p-3 font-mono">${so.sku}</td><td class="p-3 text-center font-semibold">${so.qty} / ${so.deliveredQty} pcs</td>
+      <td class="p-3"><span class="status-pill ${so.status==='Delivered'?'status-done':'status-active'}">${so.status}</span></td>
+      <td class="p-3 text-right font-bold">${money(gross)}</td><td class="p-3 text-center space-x-1">
+      ${so.deliveredQty<so.qty?`<button onclick="deliverSO('${so.id}')" class="bg-slate-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold">Validate Delivery</button>`:''}
+      ${uninvoiced>0?`<button onclick="createInvoice('${so.id}')" class="bg-emerald-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold">Create Invoice</button>`:''}</td></tr>`;
+  }).join('');
+  document.getElementById('po-table-body').innerHTML=db.purchaseOrders.map(po=>`<tr>
+    <td class="p-3 font-bold">${po.id}</td><td class="p-3">${escapeHTML(db.vendors[po.vendor]||po.vendor)}</td><td class="p-3 font-mono">${po.sku}</td>
+    <td class="p-3 text-center font-semibold">${po.orderedQty} / ${po.receivedQty} / ${po.acceptedQty} / ${po.rejectedQty}</td>
+    <td class="p-3"><span class="status-pill ${po.status==='Received'?'status-done':'status-active'}">${po.status}</span></td>
+    <td class="p-3 text-center">${po.status!=='Received'?`<button onclick="openQCModal('${po.id}')" class="bg-sky-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold">Receive & Inspect</button>`:'Receipt Validated'}</td></tr>`).join('');
+  document.getElementById('invoice-table-body').innerHTML=db.invoices.map(inv=>`<tr><td class="p-3 font-bold">${inv.id}</td><td class="p-3">${escapeHTML(db.customers[inv.customer]?.name||inv.customer)}</td><td class="p-3 text-right font-bold">${money(inv.amount)}</td><td class="p-3 text-right">${money(inv.paid||0)}</td><td class="p-3"><span class="status-pill ${inv.status==='Paid'?'status-done':'status-draft'}">${inv.status}</span></td><td class="p-3">${inv.status!=='Paid'?`<button onclick="payInvoice('${inv.id}')" class="bg-teal-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold">Register Payment</button>`:'Settled'}</td></tr>`).join('');
+  renderMasterData(); saveDB(); applyModuleAccess();
+}
+function addProduct(){if(!hasRole('Master','Procurement'))return;const sku=(prompt('Internal Reference / SKU:')||'').trim();if(!sku)return;if(db.inventory[sku])return notify('SKU sudah digunakan.');const name=(prompt('Nama produk:')||'').trim();if(!name)return;const cost=Number(prompt('Standard Cost (Rp):','0'));const price=Number(prompt('Sales Price (Rp, 0 jika bukan produk jual):','0'));const loc=prompt('Lokasi stok:','WH-PKU-FG')||'WH-PKU-FG';const stock=Math.max(0,Math.floor(Number(prompt('Stok awal:','0'))||0));if(cost<0||price<0)return notify('Harga tidak boleh negatif.');db.inventory[sku]={name,location:loc,onHand:stock,reserved:0,cost,price};logAudit(`Produk ${sku} dibuat oleh ${db.role}.`);updateUI();}
+function editProduct(sku){if(!hasRole('Master','Procurement'))return;const it=db.inventory[sku];if(!it)return;const name=prompt('Nama produk:',it.name);if(name===null)return;const cost=Number(prompt('Standard cost:',it.cost));const price=Number(prompt('Sales price:',it.price));if(!name.trim()||cost<0||price<0)return notify('Data produk tidak valid.');it.name=name.trim();it.cost=cost;it.price=price;logAudit(`Master data produk ${sku} diperbarui.`);updateUI();}
+function addCustomer(){if(!hasRole('Master','Sales'))return;const id=(prompt('Customer ID (contoh C007):')||'').trim().toUpperCase();if(!id)return;if(db.customers[id])return notify('Customer ID sudah digunakan.');const name=(prompt('Nama pelanggan:')||'').trim();if(!name)return;const city=prompt('Kota:','Pekanbaru')||'';const limit=Number(prompt('Credit limit (Rp):','1000000'));const terms=prompt('Payment terms (NET 14 / NET 30 / COD):','NET 14')||'NET 14';if(limit<0)return notify('Credit limit tidak boleh negatif.');db.customers[id]={name,city,creditLimit:limit,unpaidAR:0,paymentTerms:terms};logAudit(`Customer ${id} ditambahkan.`);updateUI();}
+function editCustomer(id){if(!hasRole('Master','Sales'))return;const c=db.customers[id];if(!c)return;const name=prompt('Nama pelanggan:',c.name);if(name===null)return;const limit=Number(prompt('Credit limit:',c.creditLimit));const terms=prompt('Payment terms:',c.paymentTerms||'NET 14');if(!name.trim()||limit<0)return notify('Data customer tidak valid.');c.name=name.trim();c.creditLimit=limit;c.paymentTerms=terms||'NET 14';logAudit(`Customer ${id} diperbarui.`);updateUI();}
+function addEmployee(){if(!hasRole('Master'))return;const name=(document.getElementById('new-employee-name').value||'').trim();const role=document.getElementById('new-employee-role').value;if(!name)return notify('Nama karyawan wajib diisi.');const id=`U${String(db.nextUser++).padStart(3,'0')}`;db.users.push({id,name,role,modules:(DEFAULT_PERMISSIONS[role]||[]).slice()});document.getElementById('new-employee-name').value='';logAudit(`Karyawan ${name} ditambahkan dengan role ${role}.`);updateUI();}
+function setEmployeePermissions(id){if(!hasRole('Master'))return;const u=db.users.find(x=>x.id===id);if(!u||u.role==='Master')return notify('Master Account tidak dapat dibatasi dari layar ini.');const modules=['sales','purchase','inventory','manufacturing','accounting','dashboard','products','contacts'];const answer=prompt('Masukkan modul yang diizinkan, dipisahkan koma:\n'+modules.join(', '),u.modules.join(', '));if(answer===null)return;const chosen=answer.split(',').map(x=>x.trim().toLowerCase()).filter(x=>modules.includes(x));u.modules=[...new Set(chosen)];logAudit(`Hak akses ${u.name} diperbarui: ${u.modules.join(', ')||'tidak ada modul'}.`);updateUI();}
+function createVendorBillPrompt(){if(!hasRole('Finance'))return;const eligible=db.purchaseOrders.filter(p=>p.acceptedQty>0&&!db.vendorBills.some(b=>b.poId===p.id));if(!eligible.length)return notify('Tidak ada Purchase Order dengan barang accepted yang belum dibuat Vendor Bill.');const id=prompt('Pilih PO:\n'+eligible.map(p=>`${p.id} — ${db.vendors[p.vendor]||p.vendor} — accepted ${p.acceptedQty}`).join('\n'),eligible[0].id);const po=eligible.find(p=>p.id===id);if(!po)return;const net=po.acceptedQty*po.price,vat=Math.round(net*TAX_RATE),amount=net+vat;const billId=`BILL/2026/${String(db.nextBill++).padStart(4,'0')}`;db.vendorBills.push({id:billId,poId:po.id,vendor:po.vendor,net,vat,amount,paid:0,status:'Posted'});const standard=po.acceptedQty*(db.inventory[po.sku]?.cost||po.price);addLedger('2020','debit',standard);if(net>standard)addLedger('5010','debit',net-standard);else if(standard>net)addLedger('5010','credit',standard-net);addLedger('1140','debit',vat);addLedger('2010','credit',amount);logAudit(`Vendor Bill ${billId} diposting dari ${po.id}; AP ${money(amount)}.`);updateUI();}
+function payVendorBill(id){if(!hasRole('Finance'))return;const b=db.vendorBills.find(x=>x.id===id);if(!b||b.status==='Paid')return;const rem=b.amount-b.paid;const val=Number(prompt(`Sisa vendor bill ${money(rem)}. Masukkan pembayaran (Rp):`,rem));if(!Number.isFinite(val)||val<=0||val>rem)return notify('Jumlah pembayaran tidak valid.');b.paid+=Math.round(val);b.status=b.paid>=b.amount?'Paid':'Partial';addLedger('2010','debit',val);addLedger('1010','credit',val);logAudit(`Pembayaran vendor ${b.id}: ${money(val)}; status ${b.status}.`);updateUI();}
+function manualJournalEntry(){if(!hasRole('Finance'))return;const desc=(prompt('Deskripsi jurnal:')||'').trim();if(!desc)return;const debitCode=prompt('Kode akun debit (contoh 1010):','1010');const creditCode=prompt('Kode akun kredit (contoh 3010):','3010');if(!db.ledger[debitCode]||!db.ledger[creditCode])return notify('Kode akun tidak ditemukan.');const amount=Number(prompt('Nominal (Rp):','0'));if(!Number.isFinite(amount)||amount<=0)return notify('Nominal harus lebih dari 0.');const ref=`MJE/${String((db.nextMJE||1)).padStart(4,'0')}`;db.nextMJE=(db.nextMJE||1)+1;addLedger(debitCode,'debit',amount);addLedger(creditCode,'credit',amount);db.journals.push({ref,date:new Date().toLocaleDateString('id-ID'),desc,debit:amount,credit:amount,status:'Posted'});logAudit(`Manual Journal ${ref} diposting; debit ${debitCode}, credit ${creditCode}, ${money(amount)}.`);updateUI();}
+function renderMasterData(){
+ const pb=document.getElementById('products-body');if(pb)pb.innerHTML=Object.entries(db.inventory).map(([sku,p])=>`<tr><td class="p-3 font-mono font-bold">${escapeHTML(sku)}</td><td class="p-3">${escapeHTML(p.name)}</td><td class="p-3">Storable Product</td><td class="p-3 text-right">${p.onHand}</td><td class="p-3 text-right">${money(p.cost)}</td><td class="p-3 text-right">${money(p.price)}</td><td class="p-3"><button onclick="editProduct('${sku}')" class="text-teal-700 font-semibold">Edit</button></td></tr>`).join('');
+ const cb=document.getElementById('contacts-body');if(cb)cb.innerHTML=Object.entries(db.customers).map(([id,c])=>`<tr><td class="p-3 font-mono font-bold">${id}</td><td class="p-3">${escapeHTML(c.name)}</td><td class="p-3">${escapeHTML(c.city||'-')}</td><td class="p-3">${money(c.creditLimit)}</td><td class="p-3">${escapeHTML(c.paymentTerms||'NET 14')}</td><td class="p-3"><button onclick="editCustomer('${id}')" class="text-teal-700 font-semibold">Edit</button></td></tr>`).join('');
+ const eb=document.getElementById('employees-body');if(eb)eb.innerHTML=(db.users||[]).map(u=>`<tr><td class="p-3 font-semibold">${escapeHTML(u.name)}</td><td class="p-3">${u.role}</td><td class="p-3">${u.modules.map(escapeHTML).join(', ')||'No modules'}</td><td class="p-3">${u.role==='Master'?'<span class="text-slate-400">Full access</span>':`<button onclick="setEmployeePermissions('${u.id}')" class="text-teal-700 font-semibold">Manage Access</button>`}</td></tr>`).join('');
+ const vb=document.getElementById('vendor-bills-body');if(vb)vb.innerHTML=(db.vendorBills||[]).map(b=>`<tr><td class="p-3 font-bold">${b.id}</td><td class="p-3">${escapeHTML(db.vendors[b.vendor]||b.vendor)}</td><td class="p-3">${b.poId}</td><td class="p-3 text-right">${money(b.amount)}</td><td class="p-3 text-right">${money(b.paid)}</td><td class="p-3">${b.status}</td><td class="p-3">${b.status!=='Paid'?`<button onclick="payVendorBill('${b.id}')" class="text-teal-700 font-semibold">Register Payment</button>`:'Settled'}</td></tr>`).join('');
+ const jb=document.getElementById('journal-body');if(jb)jb.innerHTML=(db.journals||[]).map(j=>`<tr><td class="p-3 font-bold">${j.ref}</td><td class="p-3">${j.date}</td><td class="p-3">${escapeHTML(j.desc)}</td><td class="p-3 text-right">${money(j.debit)}</td><td class="p-3 text-right">${money(j.credit)}</td><td class="p-3">${j.status}</td></tr>`).join('');
+}
+
+function resetSeedData(){
+  if(!confirm('Reset semua transaksi simulasi ke data awal? Tindakan ini tidak dapat dibatalkan.'))return;
+  db=clone(initialDataset); db.users=clone(defaultUsers);db.vendorBills=[];db.journals=[];db.nextBill=1;db.nextUser=7;db.role='Master';document.getElementById('role-select').value='Master';
+  document.getElementById('audit-logs').innerHTML='';
+  logAudit('Database simulasi dikembalikan ke baseline.');
+  calculateSOTotal();updateUI();
+}
+window.onload=()=>{
+  loadDB(); if(!db.role)db.role='Master';
+  document.getElementById('role-select').value=db.role;
+  if(window.lucide)lucide.createIcons();
+  calculateSOTotal();updateUI();
+};
+</script>
+</body>
+</html>
