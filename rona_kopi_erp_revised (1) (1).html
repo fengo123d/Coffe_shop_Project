@@ -474,10 +474,38 @@ function addLedger(code, side, amount){
   if(!db.ledger[code]) return;
   db.ledger[code][side]+=Math.round(amount);
 }
-function setStatus(order){
-  if(order.deliveredQty>=order.qty) order.status='Delivered';
-  else if(order.deliveredQty>0) order.status='Partially Delivered';
-  else order.status='Sales Order';
+function setStatus(order) {
+  if (order.status === 'Cancelled') return;
+
+  const invoicedQty = (order.invoices || []).reduce((sum, invId) => {
+    const invoice = db.invoices.find(i => i.id === invId);
+    return sum + (invoice?.qty || 0);
+  }, 0);
+
+  if (order.deliveredQty >= order.qty && invoicedQty >= order.qty) {
+    order.status = 'Completed';
+  } else if (order.deliveredQty >= order.qty) {
+    order.status = 'Delivered';
+  } else if (order.deliveredQty > 0) {
+    order.status = 'Partially Delivered';
+  } else {
+    order.status = 'Sales Order';
+  }
+}
+  function getUninvoicedQty(so) {
+  const invoicedQty = so.invoices.reduce((sum, invId) => {
+    const invoice = db.invoices.find(i => i.id === invId);
+    return sum + (invoice?.qty || 0);
+  }, 0);
+
+  return Math.max(0, so.deliveredQty - invoicedQty);
+}
+function getAvailableStock(sku) {
+  const item = db.inventory[sku];
+
+  if (!item) return 0;
+
+  return Math.max(0, item.onHand - item.reserved);
 }
 function createSalesOrder(){
   if(!hasRole('Sales'))return;
@@ -486,12 +514,31 @@ function createSalesOrder(){
   const qty=Math.floor(Number(document.getElementById('so-qty-input').value)||0);
   const disc=Number(document.getElementById('so-disc-input').value)||0;
   const item=db.inventory[sku], customer=db.customers[customerId];
+  if (!customer) {
+  return notify('Customer tidak ditemukan.');
+}
+
+if (!item || item.price <= 0) {
+  return notify('Produk tidak ditemukan atau bukan produk untuk dijual.');
+}
+
+if (!Number.isInteger(qty) || qty < 1) {
+  return notify('Kuantitas harus berupa bilangan bulat minimal 1.');
+}
+
+if (!Number.isFinite(disc) || disc < 0 || disc > 10) {
+  return notify('Diskon harus berada di antara 0–10%.');
+}
   if(!qty||qty<1)return notify('Kuantitas harus minimal 1.');
   if(!Number.isFinite(disc)||disc<0||disc>10)return notify('Diskon harus berada di antara 0–10%.');
-  const available=item.onHand-item.reserved;
+const available = getAvailableStock(sku);
   if(qty>available)return notify(`Stok tersedia hanya ${available} pcs. Kurangi kuantitas atau lakukan replenishment terlebih dahulu.`);
   const net=qty*item.price*(1-disc/100), gross=net+Math.round(net*TAX_RATE);
-  const outstanding=db.invoices.filter(i=>i.customer===customerId&&i.status!=='Paid').reduce((sum,i)=>sum+i.amount,0);
+  const outstanding = db.invoices
+  .filter(i => i.customer === customerId)
+  .reduce((sum, i) => {
+    return sum + (i.amount - (i.paid || 0));
+  }, 0);
   const openOrders=db.salesOrders.filter(o=>o.customer===customerId&&o.status!=='Cancelled').reduce((sum,o)=>sum+Math.max(0,o.qty-o.deliveredQty)*o.price*(1-o.disc/100)*(1+TAX_RATE),0);
   if(outstanding+openOrders+gross>customer.creditLimit)return notify(`Melebihi limit kredit. Tagihan terbuka + komitmen order + order baru = ${money(outstanding+openOrders+gross)}, limit ${money(customer.creditLimit)}.`);
   const id=`S${String(db.nextSO++).padStart(5,'0')}`;
@@ -500,6 +547,42 @@ function createSalesOrder(){
   logAudit(`Sales Order ${id} dikonfirmasi. ${qty} pcs ${sku} direservasi; total estimasi ${money(gross)}.`);
   updateUI();
 }
+function cancelSalesOrder(id) {
+  if (!hasRole('Sales')) return;
+
+  const so = db.salesOrders.find(o => o.id === id);
+
+  if (!so) {
+    return notify('Sales Order tidak ditemukan.');
+  }
+
+  if (so.status === 'Cancelled') {
+    return notify('Sales Order sudah dibatalkan.');
+  }
+
+  if (so.deliveredQty > 0) {
+    return notify(
+      'Order yang sudah dikirim tidak dapat dibatalkan langsung. Proses retur harus dilakukan terlebih dahulu.'
+    );
+  }
+
+  if (!confirm(`Batalkan Sales Order ${id}?`)) return;
+
+  const item = db.inventory[so.sku];
+
+  if (item) {
+    item.reserved = Math.max(0, item.reserved - so.qty);
+  }
+
+  so.status = 'Cancelled';
+
+  logAudit(
+    `Sales Order ${id} dibatalkan. Reservasi stok ${so.qty} pcs dilepaskan.`
+  );
+
+  updateUI();
+}
+
 function deliverSO(id){
   if(!hasRole('Warehouse'))return;
   const so=db.salesOrders.find(o=>o.id===id); if(!so)return;
@@ -517,7 +600,7 @@ function deliverSO(id){
 function createInvoice(id){
   if(!hasRole('Finance'))return;
   const so=db.salesOrders.find(o=>o.id===id); if(!so)return;
-  const uninvoiced=so.deliveredQty-so.invoices.reduce((sum,invId)=>sum+(db.invoices.find(i=>i.id===invId)?.qty||0),0);
+ const uninvoiced = getUninvoicedQty(so);
   if(uninvoiced<=0)return notify('Tidak ada kuantitas terkirim yang belum ditagih.');
   const net=uninvoiced*so.price*(1-so.disc/100), vat=Math.round(net*TAX_RATE), gross=net+vat;
   const idInv=`INV/2026/${String(db.nextINV++).padStart(4,'0')}`;
@@ -526,15 +609,47 @@ function createInvoice(id){
   db.customers[so.customer].unpaidAR+=gross;
   addLedger('1100','debit',gross); addLedger('4010','credit',net); addLedger('2030','credit',vat);
   logAudit(`Invoice ${idInv} diposting untuk ${uninvoiced} pcs dari ${so.id}; piutang ${money(gross)}.`);
+  setStatus(so);
   updateUI();
 }
-function payInvoice(id){
-  if(!hasRole('Finance'))return;
-  const inv=db.invoices.find(i=>i.id===id); if(!inv||inv.status==='Paid')return;
-  const remaining=inv.amount-(inv.paid||0); const entered=Number(prompt(`Sisa tagihan ${money(remaining)}. Masukkan pembayaran (Rp):`,remaining)); if(!Number.isFinite(entered)||entered<=0||entered>remaining)return notify('Jumlah pembayaran tidak valid.'); inv.paid=(inv.paid||0)+Math.round(entered); inv.status=inv.paid>=inv.amount?'Paid':'Partial';
-  db.customers[inv.customer].unpaidAR=Math.max(0,db.customers[inv.customer].unpaidAR-Math.round(entered));
-  addLedger('1010','debit',entered); addLedger('1100','credit',entered);
-  logAudit(`Pembayaran ${id} sebesar ${money(entered)} direkonsiliasi. Status: ${inv.status}.`);
+function payInvoice(id) {
+  if (!hasRole('Finance')) return;
+
+  const inv = db.invoices.find(i => i.id === id);
+
+  if (!inv || inv.status === 'Paid') {
+    return notify('Invoice tidak ditemukan atau sudah lunas.');
+  }
+
+  const paid = Math.round(inv.paid || 0);
+  const remaining = Math.max(0, inv.amount - paid);
+
+  const entered = Number(
+    prompt(`Sisa tagihan ${money(remaining)}. Masukkan pembayaran (Rp):`, remaining)
+  );
+
+  if (!Number.isFinite(entered) || entered <= 0 || entered > remaining) {
+    return notify('Jumlah pembayaran tidak valid.');
+  }
+
+  const payment = Math.round(entered);
+
+  inv.paid = paid + payment;
+  inv.status = inv.paid >= inv.amount ? 'Paid' : 'Partial';
+
+  const customer = db.customers[inv.customer];
+
+  if (customer) {
+    customer.unpaidAR = Math.max(0, customer.unpaidAR - payment);
+  }
+
+  addLedger('1010', 'debit', payment);
+  addLedger('1100', 'credit', payment);
+
+  logAudit(
+    `Pembayaran ${id} sebesar ${money(payment)}. Status: ${inv.status}.`
+  );
+
   updateUI();
 }
 function createPurchaseOrder(){
@@ -588,7 +703,7 @@ function executeMO(){
   const bom=[{sku:'RM-AR-KG',qty:qty*0.2},{sku:'PK-200',qty},{sku:'LB-STD',qty}];
   for(const line of bom){
     const item=db.inventory[line.sku];
-    if(!item||item.onHand-item.reserved<line.qty)return notify(`Bahan ${line.sku} tidak cukup. Tersedia ${item?item.onHand-item.reserved:0}, dibutuhkan ${line.qty}.`);
+   if (!item || getAvailableStock(line.sku) < line.qty)return notify(`Bahan ${line.sku} tidak cukup. Tersedia ${item?item.onHand-item.reserved:0}, dibutuhkan ${line.qty}.`);
   }
   const totalCost=bom.reduce((sum,line)=>sum+line.qty*db.inventory[line.sku].cost,0);
   bom.forEach(line=>db.inventory[line.sku].onHand-=line.qty);
@@ -621,7 +736,7 @@ function updateUI(){
     <td class="p-2.5 text-right font-bold text-emerald-700">${it.onHand-it.reserved}</td><td class="p-2.5 text-right">${money(it.cost)}</td></tr>`).join('');
   document.getElementById('so-table-body').innerHTML=db.salesOrders.map(so=>{
     const net=so.qty*so.price*(1-so.disc/100), gross=net+Math.round(net*TAX_RATE);
-    const uninvoiced=so.deliveredQty-so.invoices.reduce((sum,invId)=>sum+(db.invoices.find(i=>i.id===invId)?.qty||0),0);
+    const uninvoiced = getUninvoicedQty(so);
     return `<tr><td class="p-3 font-bold text-teal-700">${so.id}</td><td class="p-3">${escapeHTML(db.customers[so.customer].name)}</td>
       <td class="p-3 font-mono">${so.sku}</td><td class="p-3 text-center font-semibold">${so.qty} / ${so.deliveredQty} pcs</td>
       <td class="p-3"><span class="status-pill ${so.status==='Delivered'?'status-done':'status-active'}">${so.status}</span></td>
